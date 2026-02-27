@@ -473,7 +473,7 @@
                 </div>
                 <div class="setup-item">
                     <label>小盲/大盲</label>
-                    <input type="text" id="blinds" value="10/20" onchange="updateBlinds()">
+                    <input type="text" id="blinds" value="10/20">
                 </div>
             </div>
         </div>
@@ -579,22 +579,18 @@
         };
         
         // ==================== 初始化 ====================
-        function updateBlinds() {
-            const blindsInput = document.getElementById('blinds');
-            if (!blindsInput) return;
-            const parts = blindsInput.value.split('/');
-            if (parts.length === 2) {
-                game.sb = parseInt(parts[0]) || 10;
-                game.bb = parseInt(parts[1]) || 20;
-            }
-        }
-        
         function updateAIList() {
             const countSelect = document.getElementById('aiCount');
-            if (!countSelect) return;
-            const count = parseInt(countSelect.value);
+            if (!countSelect) {
+                console.log('aiCount not found');
+                return;
+            }
+            const count = parseInt(countSelect.value) || 4;
             const container = document.getElementById('aiConfigList');
-            if (!container) return;
+            if (!container) {
+                console.log('aiConfigList not found');
+                return;
+            }
             container.innerHTML = '';
             
             for (let i = 0; i < count; i++) {
@@ -611,18 +607,14 @@
                 `;
                 container.appendChild(div);
             }
+            console.log('AI list updated with ' + count + ' players');
         }
         
         // DOM加载完成后初始化
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                updateAIList();
-                updateBlinds();
-            });
-        } else {
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing...');
             updateAIList();
-            updateBlinds();
-        }
+        });
         
         // ==================== 卡牌系统 ====================
         function createDeck() {
@@ -646,8 +638,19 @@
         
         // ==================== 开始游戏 ====================
         function startGame() {
-            const startingChips = parseInt(document.getElementById('startingChips').value);
-            const aiCount = parseInt(document.getElementById('aiCount').value);
+            // 先更新盲注设置
+            const blindsInput = document.getElementById('blinds');
+            if (blindsInput) {
+                const parts = blindsInput.value.split('/');
+                if (parts.length === 2) {
+                    game.sb = parseInt(parts[0]) || 10;
+                    game.bb = parseInt(parts[1]) || 20;
+                }
+            }
+            
+            const startingChips = parseInt(document.getElementById('startingChips').value) || 1000;
+            const aiCountSelect = document.getElementById('aiCount');
+            const aiCount = aiCountSelect ? parseInt(aiCountSelect.value) : 4;
             
             // 创建玩家
             game.players = [{
@@ -657,7 +660,8 @@
             }];
             
             for (let i = 0; i < aiCount; i++) {
-                const type = document.getElementById(`aiType${i}`).value;
+                const typeSelect = document.getElementById(`aiType${i}`);
+                const type = typeSelect ? typeSelect.value : 'LAG';
                 game.players.push({
                     id: i + 1, name: `AI${i + 1}`, type,
                     isHuman: false, chips: startingChips,
@@ -669,8 +673,10 @@
             game.dealerIndex = Math.floor(Math.random() * game.players.length);
             
             // 切换界面
-            document.getElementById('setupScreen').style.display = 'none';
-            document.getElementById('gameTable').style.display = 'flex';
+            const setupScreen = document.getElementById('setupScreen');
+            const gameTable = document.getElementById('gameTable');
+            if (setupScreen) setupScreen.style.display = 'none';
+            if (gameTable) gameTable.style.display = 'flex';
             
             newHand();
         }
