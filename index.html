@@ -590,6 +590,56 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // 确保函数在全局作用域
+        window.startGame = function() {
+            console.log('startGame called');
+            alert('游戏开始！'); // 临时测试
+            
+            // 先更新盲注设置
+            const blindsInput = document.getElementById('blinds');
+            if (blindsInput) {
+                const parts = blindsInput.value.split('/');
+                if (parts.length === 2) {
+                    game.sb = parseInt(parts[0]) || 10;
+                    game.bb = parseInt(parts[1]) || 20;
+                }
+            }
+            
+            const startingChipsInput = document.getElementById('startingChips');
+            const startingChips = startingChipsInput ? parseInt(startingChipsInput.value) || 1000 : 1000;
+            
+            const aiCountSelect = document.getElementById('aiCount');
+            const aiCount = aiCountSelect ? parseInt(aiCountSelect.value) : 4;
+            
+            // 创建玩家
+            game.players = [{
+                id: 0, name: '你', isHuman: true,
+                chips: startingChips, cards: [],
+                bet: 0, folded: false, allIn: false
+            }];
+            
+            for (let i = 0; i < aiCount; i++) {
+                const typeSelect = document.getElementById(`aiType${i}`);
+                const type = typeSelect ? typeSelect.value : 'LAG';
+                game.players.push({
+                    id: i + 1, name: `AI${i + 1}`, type,
+                    isHuman: false, chips: startingChips,
+                    cards: [], bet: 0, folded: false, allIn: false
+                });
+            }
+            
+            // 随机庄家
+            game.dealerIndex = Math.floor(Math.random() * game.players.length);
+            
+            // 切换界面
+            const setupScreen = document.getElementById('setupScreen');
+            const gameTable = document.getElementById('gameTable');
+            if (setupScreen) setupScreen.style.display = 'none';
+            if (gameTable) gameTable.style.display = 'flex';
+            
+            newHand();
+        };
+        
         // ==================== 游戏常量 ====================
         const SUITS = ['♠', '♥', '♦', '♣'];
         const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
@@ -704,74 +754,6 @@
         
         function deal() {
             return game.deck.pop();
-        }
-        
-        // ==================== 开始游戏 ====================
-        function startGame() {
-            debug('Starting game...');
-            
-            // 先更新盲注设置
-            const blindsInput = document.getElementById('blinds');
-            if (blindsInput) {
-                const parts = blindsInput.value.split('/');
-                if (parts.length === 2) {
-                    game.sb = parseInt(parts[0]) || 10;
-                    game.bb = parseInt(parts[1]) || 20;
-                }
-                debug(`Blinds set: SB=${game.sb}, BB=${game.bb}`);
-            } else {
-                debug('❌ blinds input not found');
-            }
-            
-            const startingChipsInput = document.getElementById('startingChips');
-            const startingChips = startingChipsInput ? parseInt(startingChipsInput.value) || 1000 : 1000;
-            debug(`Starting chips: ${startingChips}`);
-            
-            const aiCountSelect = document.getElementById('aiCount');
-            const aiCount = aiCountSelect ? parseInt(aiCountSelect.value) : 4;
-            debug(`AI count: ${aiCount}`);
-            
-            // 创建玩家
-            game.players = [{
-                id: 0, name: '你', isHuman: true,
-                chips: startingChips, cards: [],
-                bet: 0, folded: false, allIn: false
-            }];
-            debug('Created human player');
-            
-            for (let i = 0; i < aiCount; i++) {
-                const typeSelect = document.getElementById(`aiType${i}`);
-                const type = typeSelect ? typeSelect.value : 'LAG';
-                game.players.push({
-                    id: i + 1, name: `AI${i + 1}`, type,
-                    isHuman: false, chips: startingChips,
-                    cards: [], bet: 0, folded: false, allIn: false
-                });
-            }
-            debug(`Created ${aiCount} AI players`);
-            
-            // 随机庄家
-            game.dealerIndex = Math.floor(Math.random() * game.players.length);
-            debug(`Dealer index: ${game.dealerIndex}`);
-            
-            // 切换界面
-            const setupScreen = document.getElementById('setupScreen');
-            const gameTable = document.getElementById('gameTable');
-            if (setupScreen) {
-                setupScreen.style.display = 'none';
-                debug('Hidden setup screen');
-            } else {
-                debug('❌ setupScreen not found');
-            }
-            if (gameTable) {
-                gameTable.style.display = 'flex';
-                debug('Shown game table');
-            } else {
-                debug('❌ gameTable not found');
-            }
-            
-            debug('Calling newHand...');
-            newHand();
         }
         
         // ==================== 新一局 ====================
