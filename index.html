@@ -129,11 +129,11 @@
     </div>
     
     <div class="toast" id="toast"></div>
-    <div class="version">Texas Hold'em v1.0.7</div>
+    <div class="version">Texas Hold'em v1.0.8</div>
 
     <script>
         // 版本号
-        const VERSION = 'v1.0.7';
+        const VERSION = 'v1.0.8';
         console.log('Texas Hold\'em Game ' + VERSION);
         
         // 游戏常量
@@ -237,16 +237,48 @@
         function evaluateHandRank(hole, community) {
             var all = hole.concat(community);
             if (all.length < 2) return '-';
+            
             var ranks = all.map(function(c) { return c.value; });
+            var suits = all.map(function(c) { return c.suit; });
+            
+            // 统计点数
             var rankCounts = {};
             ranks.forEach(function(r) { rankCounts[r] = (rankCounts[r] || 0) + 1; });
             var counts = Object.values(rankCounts).sort(function(a, b) { return b - a; });
             
+            // 检查同花
+            var suitCounts = {};
+            suits.forEach(function(s) { suitCounts[s] = (suitCounts[s] || 0) + 1; });
+            var hasFlush = false;
+            for (var sk in suitCounts) { if (suitCounts[sk] >= 5) hasFlush = true; }
+            
+            // 检查顺子（修复：使用所有牌的点数，包括重复的）
+            var uniqueRanks = [];
+            for (var uk in rankCounts) uniqueRanks.push(parseInt(uk));
+            uniqueRanks.sort(function(a, b) { return a - b; });
+            
+            var hasStraight = false;
+            // 检查普通顺子
+            for (var i = 0; i <= uniqueRanks.length - 5; i++) {
+                if (uniqueRanks[i+4] - uniqueRanks[i] === 4) hasStraight = true;
+            }
+            // 检查 A-5 顺子 (A-2-3-4-5)
+            if (uniqueRanks.indexOf(12) !== -1 && uniqueRanks.indexOf(0) !== -1 && 
+                uniqueRanks.indexOf(1) !== -1 && uniqueRanks.indexOf(2) !== -1 && 
+                uniqueRanks.indexOf(3) !== -1) {
+                hasStraight = true;
+            }
+            
+            // 判断牌型
+            if (hasStraight && hasFlush) return '同花顺';
             if (counts[0] >= 4) return '四条';
             if (counts[0] === 3 && counts[1] >= 2) return '葫芦';
+            if (hasFlush) return '同花';
+            if (hasStraight) return '顺子';
             if (counts[0] === 3) return '三条';
             if (counts[0] === 2 && counts[1] === 2) return '两对';
             if (counts[0] === 2) return '一对';
+            
             return RANKS[Math.max(hole[0].value, hole[1].value)] + '高牌';
         }
         
@@ -317,6 +349,9 @@
             placeBet(game.players[bbIndex], game.bb);
             game.currentBet = game.bb;
             game.lastRaiserIndex = bbIndex;  // 大盲视为最后"加注"者
+            actedPlayers.clear();
+            actedPlayers.add(sbIndex);
+            actedPlayers.add(bbIndex);  // 盲注玩家已行动
             game.activeIndex = (bbIndex + 1) % game.players.length;
             
             showToast('新一局开始');
@@ -469,9 +504,15 @@
             }, 1000);
         }
         
+        // 跟踪每轮谁已经行动过
+        let actedPlayers = new Set();
+        
         function nextPlayer() {
             var active = game.players.filter(function(p) { return !p.folded; });
             if (active.length === 1) { endHand(active[0]); return; }
+            
+            // 记录当前玩家已行动
+            actedPlayers.add(game.activeIndex);
             
             // 找到下一个未弃牌且未allin的玩家
             var nextIndex = game.activeIndex;
@@ -479,15 +520,24 @@
                 nextIndex = (nextIndex + 1) % game.players.length;
             } while (game.players[nextIndex].folded || game.players[nextIndex].allIn);
             
-            // 检查是否回到最后加注者（或所有未弃牌玩家都已行动且下注相等）
+            // 检查是否需要进入下一阶段
             var needToAct = game.players.filter(function(p) { return !p.folded && !p.allIn; });
+            var allBetsEqual = needToAct.every(function(p) { return p.bet === game.currentBet; });
             
-            // 如果回到最后加注者位置，或者所有人都check过（currentBet为0且所有人都行动过）
-            var allChecked = (game.currentBet === 0 && game.lastRaiserIndex === -1);
-            var backToRaiser = (game.lastRaiserIndex !== -1 && nextIndex === game.lastRaiserIndex);
-            var allCalled = needToAct.every(function(p) { return p.bet === game.currentBet; });
+            // 条件1：所有人都下注相等，且所有人都至少行动过一次
+            var allActed = needToAct.every(function(p, idx) {
+                var playerIdx = game.players.indexOf(p);
+                return actedPlayers.has(playerIdx);
+            });
             
-            if ((backToRaiser || allChecked) && allCalled && needToAct.length > 0) {
+            // 条件2：回到最后加注者位置
+            var backToRaiser = (game.lastRaiserIndex !== -1 && nextIndex === game.lastRaiserIndex && allBetsEqual);
+            
+            // 条件3：所有人都过牌（currentBet为0，且所有人都行动过）
+            var allChecked = (game.currentBet === 0 && allActed && actedPlayers.size >= needToAct.length);
+            
+            if ((backToRaiser || allChecked) && allBetsEqual && needToAct.length > 0) {
+                actedPlayers.clear();  // 清空已行动记录
                 nextStage();
                 return;
             }
@@ -500,6 +550,8 @@
             // 收拢所有下注到底池
             game.players.forEach(function(p) { p.bet = 0; });
             game.currentBet = 0;
+            game.lastRaiserIndex = -1;
+            actedPlayers.clear();  // 清空已行动记录
             
             // 发牌
             if (game.stage === 'preflop') {
@@ -526,6 +578,7 @@
             }
             game.activeIndex = startIndex;
             game.lastRaiserIndex = -1;  // 新一轮，重置加注者
+            actedPlayers.clear();  // 清空已行动记录
             
             updateDisplay();
             nextTurn();
