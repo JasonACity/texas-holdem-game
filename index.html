@@ -380,8 +380,41 @@
             color: rgba(255,215,0,0.3);
         }
         
-        /* 操作按钮 */
-        .action-buttons {
+        /* 调试面板 */
+        .debug-panel {
+            position: fixed;
+            top: 50px;
+            left: 10px;
+            right: 10px;
+            max-height: 200px;
+            background: rgba(0,0,0,0.95);
+            border: 2px solid #ff0000;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 0.75rem;
+            color: #0f0;
+            overflow-y: auto;
+            z-index: 9999;
+            display: none;
+            font-family: monospace;
+        }
+        
+        .debug-panel.show {
+            display: block;
+        }
+        
+        .debug-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,0,0,0.7);
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            z-index: 10000;
+        }
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
@@ -460,6 +493,10 @@
     </style>
 </head>
 <body>
+    <!-- 调试面板 -->
+    <button class="debug-toggle" onclick="toggleDebug()">调试</button>
+    <div class="debug-panel" id="debugPanel"></div>
+    
     <!-- 设置界面 -->
     <div class="setup-screen" id="setupScreen">
         <h1>🃏 德州扑克</h1>
@@ -578,17 +615,49 @@
             bb: 20
         };
         
+        // ==================== 调试功能 ====================
+        let debugLogs = [];
+        
+        function debug(msg) {
+            debugLogs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+            const panel = document.getElementById('debugPanel');
+            if (panel) {
+                panel.innerHTML = debugLogs.join('<br>');
+                panel.scrollTop = panel.scrollHeight;
+            }
+            console.log(msg);
+        }
+        
+        function toggleDebug() {
+            const panel = document.getElementById('debugPanel');
+            if (panel) {
+                panel.classList.toggle('show');
+            }
+        }
+        
+        // 捕获全局错误
+        window.onerror = function(msg, url, line, col, error) {
+            debug(`❌ ERROR: ${msg} (Line ${line})`);
+            return false;
+        };
+        
+        // 捕获未处理的Promise错误
+        window.addEventListener('unhandledrejection', function(event) {
+            debug(`❌ Promise ERROR: ${event.reason}`);
+        });
+        
         // ==================== 初始化 ====================
         function updateAIList() {
+            debug('Updating AI list...');
             const countSelect = document.getElementById('aiCount');
             if (!countSelect) {
-                console.log('aiCount not found');
+                debug('❌ aiCount not found');
                 return;
             }
             const count = parseInt(countSelect.value) || 4;
             const container = document.getElementById('aiConfigList');
             if (!container) {
-                console.log('aiConfigList not found');
+                debug('❌ aiConfigList not found');
                 return;
             }
             container.innerHTML = '';
@@ -607,13 +676,14 @@
                 `;
                 container.appendChild(div);
             }
-            console.log('AI list updated with ' + count + ' players');
+            debug(`✅ AI list updated with ${count} players`);
         }
         
         // DOM加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing...');
+            debug('DOM loaded, initializing...');
             updateAIList();
+            debug('✅ Initialization complete');
         });
         
         // ==================== 卡牌系统 ====================
@@ -638,6 +708,8 @@
         
         // ==================== 开始游戏 ====================
         function startGame() {
+            debug('Starting game...');
+            
             // 先更新盲注设置
             const blindsInput = document.getElementById('blinds');
             if (blindsInput) {
@@ -646,11 +718,18 @@
                     game.sb = parseInt(parts[0]) || 10;
                     game.bb = parseInt(parts[1]) || 20;
                 }
+                debug(`Blinds set: SB=${game.sb}, BB=${game.bb}`);
+            } else {
+                debug('❌ blinds input not found');
             }
             
-            const startingChips = parseInt(document.getElementById('startingChips').value) || 1000;
+            const startingChipsInput = document.getElementById('startingChips');
+            const startingChips = startingChipsInput ? parseInt(startingChipsInput.value) || 1000 : 1000;
+            debug(`Starting chips: ${startingChips}`);
+            
             const aiCountSelect = document.getElementById('aiCount');
             const aiCount = aiCountSelect ? parseInt(aiCountSelect.value) : 4;
+            debug(`AI count: ${aiCount}`);
             
             // 创建玩家
             game.players = [{
@@ -658,6 +737,7 @@
                 chips: startingChips, cards: [],
                 bet: 0, folded: false, allIn: false
             }];
+            debug('Created human player');
             
             for (let i = 0; i < aiCount; i++) {
                 const typeSelect = document.getElementById(`aiType${i}`);
@@ -668,16 +748,29 @@
                     cards: [], bet: 0, folded: false, allIn: false
                 });
             }
+            debug(`Created ${aiCount} AI players`);
             
             // 随机庄家
             game.dealerIndex = Math.floor(Math.random() * game.players.length);
+            debug(`Dealer index: ${game.dealerIndex}`);
             
             // 切换界面
             const setupScreen = document.getElementById('setupScreen');
             const gameTable = document.getElementById('gameTable');
-            if (setupScreen) setupScreen.style.display = 'none';
-            if (gameTable) gameTable.style.display = 'flex';
+            if (setupScreen) {
+                setupScreen.style.display = 'none';
+                debug('Hidden setup screen');
+            } else {
+                debug('❌ setupScreen not found');
+            }
+            if (gameTable) {
+                gameTable.style.display = 'flex';
+                debug('Shown game table');
+            } else {
+                debug('❌ gameTable not found');
+            }
             
+            debug('Calling newHand...');
             newHand();
         }
         
