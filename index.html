@@ -129,11 +129,11 @@
     </div>
     
     <div class="toast" id="toast"></div>
-    <div class="version">Texas Hold'em v1.0.5</div>
+    <div class="version">Texas Hold'em v1.0.6</div>
 
     <script>
         // 版本号
-        const VERSION = 'v1.0.5';
+        const VERSION = 'v1.0.6';
         console.log('Texas Hold\'em Game ' + VERSION);
         
         // 游戏常量
@@ -480,30 +480,35 @@
         }
         
         function nextStage() {
+            // 收拢所有下注到底池
             game.players.forEach(function(p) { p.bet = 0; });
             game.currentBet = 0;
             
+            // 发牌
             if (game.stage === 'preflop') {
                 game.stage = 'flop';
                 game.communityCards.push(deal(), deal(), deal());
-                showToast('翻牌');
+                showToast('翻牌: ' + game.communityCards.map(function(c) { return c.rank + c.suit; }).join(' '));
             } else if (game.stage === 'flop') {
                 game.stage = 'turn';
                 game.communityCards.push(deal());
-                showToast('转牌');
+                showToast('转牌: ' + game.communityCards[3].rank + game.communityCards[3].suit);
             } else if (game.stage === 'turn') {
                 game.stage = 'river';
                 game.communityCards.push(deal());
-                showToast('河牌');
+                showToast('河牌: ' + game.communityCards[4].rank + game.communityCards[4].suit);
             } else if (game.stage === 'river') {
                 showdown();
                 return;
             }
             
-            game.activeIndex = (game.dealerIndex + 1) % game.players.length;
-            while (game.players[game.activeIndex].folded) {
-                game.activeIndex = (game.activeIndex + 1) % game.players.length;
+            // 找到第一个未弃牌的玩家（从庄家左边开始）
+            var startIndex = (game.dealerIndex + 1) % game.players.length;
+            while (game.players[startIndex].folded) {
+                startIndex = (startIndex + 1) % game.players.length;
             }
+            game.activeIndex = startIndex;
+            
             updateDisplay();
             nextTurn();
         }
